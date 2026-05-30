@@ -1,0 +1,9 @@
+[project]
+name = "stattab"
+version = "0.1.0"
+description = "Import data cubes from the Swiss Federal Statistical Office (BFS)"
+requires-python = ">=3.12"
+dependencies = [
+    "pandas>=3.0",
+    "requests>=2.32",
+]

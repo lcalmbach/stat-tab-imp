@@ -1,0 +1,23 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv/
+
+# Output files
+output/*.csv
+*.csv
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+
+claude.md

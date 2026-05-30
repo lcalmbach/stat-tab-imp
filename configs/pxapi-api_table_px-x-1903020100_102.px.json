@@ -1,0 +1,53 @@
+{"queryObj":{
+  "query": [
+    {
+      "code": "Straftat",
+      "selection": {
+        "filter": "item",
+        "values": [
+          "311.00.T0"
+        ]
+      }
+    },
+    {
+      "code": "Geschlecht",
+      "selection": {
+        "filter": "item",
+        "values": [
+          "1",
+          "2"
+        ]
+      }
+    },
+    {
+      "code": "Altersklasse",
+      "selection": {
+        "filter": "item",
+        "values": [
+          "Total",
+          "0-9",
+          "10-14",
+          "15-17",
+          "18-19",
+          "20-24",
+          "25-29",
+          "30-34",
+          "35-39",
+          "40-44",
+          "45-49",
+          "50-54",
+          "55-59",
+          "60-64",
+          "65-69",
+          "70-79",
+          "80-89",
+          "90-HIGH",
+          "o.A."
+        ]
+      }
+    }
+  ],
+  "response": {
+    "format": "json-stat"
+  }
+},"tableIdForQuery":"px-x-1903020100_102.px"}
