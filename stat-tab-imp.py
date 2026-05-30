@@ -26,13 +26,14 @@ def resolve_config(config: dict, config_name: str) -> tuple[str, dict] | None:
     return None
 
 
-def run_import(config_path: Path, verbose: bool = False) -> bool:
+def fetch_dataframe(config_path: Path) -> pd.DataFrame | None:
+    """Fetch a BFS PxWeb cube and return it as a DataFrame. Does not write any files."""
     config_name = config_path.stem
     config = json.loads(config_path.read_text())
 
     resolved = resolve_config(config, config_name)
     if resolved is None:
-        return False
+        return None
     url, payload = resolved
 
     try:
@@ -46,7 +47,7 @@ def run_import(config_path: Path, verbose: bool = False) -> bool:
             )
         else:
             print(f"[{config_name}] API error {response.status_code}: {response.text[:300]}")
-        return False
+        return None
 
     data = response.json()
     ds = data["dataset"]
@@ -72,7 +73,15 @@ def run_import(config_path: Path, verbose: bool = False) -> bool:
         row["value"] = None if raw is None else raw
         rows.append(row)
 
-    df = pd.DataFrame(rows)
+    return pd.DataFrame(rows)
+
+
+def run_import(config_path: Path, verbose: bool = False) -> bool:
+    config_name = config_path.stem
+    df = fetch_dataframe(config_path)
+    if df is None:
+        return False
+
     out = config_path.parents[1] / "output" / f"{config_name}.csv"
     out.parent.mkdir(exist_ok=True)
     df.to_csv(out, index=False)
@@ -102,7 +111,7 @@ def main():
         ok = sum(run_import(p, args.verbose) for p in config_files)
         print(f"\n{ok}/{len(config_files)} imports succeeded.")
     else:
-        config_name = Path(args.config).stem
+        config_name = args.config.removesuffix(".json")
         config_path = configs_dir / f"{config_name}.json"
         if not config_path.exists():
             raise SystemExit(f"Config file not found: {config_path}")

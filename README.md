@@ -172,13 +172,61 @@ If you prefer to write the config by hand or need full control over the URL:
 - `payload.query` — dimension filters; omit a dimension entirely to include all its values
 - `payload.response.format` — must be `"json-stat"`
 
+## Using stat-tab-imp as a library
+
+`stat-tab-imp.py` exposes a `fetch_dataframe(config_path)` function that downloads a cube and returns a `pandas.DataFrame` without writing any files. Use this when you want to process or store the data yourself rather than getting a CSV.
+
+Because the filename contains hyphens, it cannot be imported with a normal `import` statement. Use `importlib` instead:
+
+```python
+import importlib.util
+from pathlib import Path
+
+def load_stattab_module():
+    spec = importlib.util.spec_from_file_location(
+        "stattab_imp",
+        Path(__file__).parent / "stat-tab-imp.py",
+    )
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+stattab = load_stattab_module()
+config_path = Path("configs/farms-bs.json")
+df = stattab.fetch_dataframe(config_path)  # returns pd.DataFrame or None on error
+```
+
+### Example: import into SQLite
+
+`stattab_to_sqlite.py` is a ready-to-run example of this pattern. It fetches a cube and loads it into an SQLite table using `pandas.to_sql()`:
+
+```bash
+# Create/replace table (default)
+uv run python stattab_to_sqlite.py farms-bs
+
+# Custom database file and table name
+uv run python stattab_to_sqlite.py farms-bs --db mydata.db --table agricultural_holdings
+
+# Append rows instead of replacing the table
+uv run python stattab_to_sqlite.py farms-bs --append
+```
+
+The config name follows the same rules as `stat-tab-imp.py` — pass the filename without `.json`, or with the full name including any `.px` suffix:
+
+```bash
+uv run python stattab_to_sqlite.py pxapi-api_table_px-x-1903020100_102.px
+```
+
+The same `load_stattab_module()` + `fetch_dataframe()` pattern works for any other target — a PostgreSQL database, an API call, a reporting pipeline, etc. Only the part after `df = stattab.fetch_dataframe(config_path)` needs to change.
+
 ## Project layout
 
 ```
 stattab/
-├── stat-tab-imp.py     # importer script
-├── pyproject.toml      # dependencies
+├── stat-tab-imp.py        # PxWeb importer — CLI and library
+├── stattab_to_sqlite.py   # example: fetch cube → SQLite table
+├── pyproject.toml         # dependencies
 ├── configs/
-│   └── farms-bs.json   # example: agricultural holdings, Basel-Stadt
-└── output/             # generated CSVs (gitignored)
+│   └── farms-bs.json      # example: agricultural holdings, Basel-Stadt
+└── output/                # generated CSVs (gitignored)
 ```
