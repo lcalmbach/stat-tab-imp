@@ -1,4 +1,4 @@
-# stat-tab-importer
+# stimp — stat-tab-importer
 
 A CLI utility for downloading statistical data cubes from the [Swiss Federal Statistical Office (BFS)](https://www.bfs.admin.ch) into local CSV files, driven by reusable named JSON config files.
 
@@ -20,16 +20,16 @@ The BFS publishes data through the **PxWeb API** (`pxweb.bfs.admin.ch`). Each da
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # Clone the repo and set up the environment
-git clone <repo-url>
-cd stattab
+git clone https://github.com/lcalmbach/stat-tab-imp
+cd stat-tab-imp
 uv sync
 ```
 
 ### With pip
 
 ```bash
-git clone <repo-url>
-cd stattab
+git clone https://github.com/lcalmbach/stat-tab-imp
+cd stat-tab-imp
 python -m venv .venv
 source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install requests pandas
@@ -39,17 +39,17 @@ pip install requests pandas
 
 ```bash
 # Run a single import
-uv run python stat-tab-imp.py <config-name>
+uv run python stimp.py <config-name>
 
 # Run all imports in the configs/ folder
-uv run python stat-tab-imp.py --all
+uv run python stimp.py --all
 
 # Show first rows of output after each import
-uv run python stat-tab-imp.py <config-name> --verbose
-uv run python stat-tab-imp.py --all --verbose
+uv run python stimp.py <config-name> --verbose
+uv run python stimp.py --all --verbose
 
 # With activated venv (instead of uv run)
-python stat-tab-imp.py <config-name>
+python stimp.py <config-name>
 ```
 
 `<config-name>` is the name of a JSON file in the `configs/` directory (without the `.json` extension). Output CSVs are written to `output/<config-name>.csv`. The `output/` directory is created automatically.
@@ -59,13 +59,13 @@ When using `--all`, every `.json` file in `configs/` is imported in turn. Failur
 ### Example
 
 ```bash
-uv run python stat-tab-imp.py farms-bs
-# → output/farms-bs.csv
+uv run python stimp.py criminal-stats
+# → output/criminal-stats.csv
 
-uv run python stat-tab-imp.py --all
-# → output/farms-bs.csv
+uv run python stimp.py --all
+# → output/criminal-stats.csv
 # → output/...csv
-# 2/2 imports succeeded.
+# 1/1 imports succeeded.
 ```
 
 ## How it works
@@ -84,7 +84,7 @@ Click **Tabelle erstellen** (Create table) to preview the result. Once the table
 
 ### 4. Save the downloaded file to the configs folder
 
-Move or copy the downloaded `.json` file into the `configs/` folder. You can rename it to something descriptive (e.g. `farms-bs.json`). No further editing is needed — the importer reads the file format produced by the BFS tool directly.
+Move or copy the downloaded `.json` file into the `configs/` folder. Rename it to something descriptive (e.g. `criminal-stats.json`). No further editing is needed — the importer reads the file format produced by the BFS tool directly.
 
 ### 5. Adjust and refine
 
@@ -100,10 +100,10 @@ Re-run the import after each change to verify the result.
 
 ```bash
 # Single config
-uv run python stat-tab-imp.py farms-bs
+uv run python stimp.py criminal-stats
 
 # All configs at once
-uv run python stat-tab-imp.py --all
+uv run python stimp.py --all
 ```
 
 The output CSV is written to `output/<config-name>.csv` and can be opened directly in Excel, loaded into pandas, or imported into a database.
@@ -172,61 +172,43 @@ If you prefer to write the config by hand or need full control over the URL:
 - `payload.query` — dimension filters; omit a dimension entirely to include all its values
 - `payload.response.format` — must be `"json-stat"`
 
-## Using stat-tab-imp as a library
+## Using stimp as a library
 
-`stat-tab-imp.py` exposes a `fetch_dataframe(config_path)` function that downloads a cube and returns a `pandas.DataFrame` without writing any files. Use this when you want to process or store the data yourself rather than getting a CSV.
-
-Because the filename contains hyphens, it cannot be imported with a normal `import` statement. Use `importlib` instead:
+`stimp.py` exposes a `fetch_dataframe(config_path)` function that downloads a cube and returns a `pandas.DataFrame` without writing any files. Use this when you want to process or store the data yourself rather than getting a CSV.
 
 ```python
-import importlib.util
+import stimp
 from pathlib import Path
 
-def load_stattab_module():
-    spec = importlib.util.spec_from_file_location(
-        "stattab_imp",
-        Path(__file__).parent / "stat-tab-imp.py",
-    )
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
-
-stattab = load_stattab_module()
-config_path = Path("configs/farms-bs.json")
-df = stattab.fetch_dataframe(config_path)  # returns pd.DataFrame or None on error
+config_path = Path("configs/criminal-stats.json")
+df = stimp.fetch_dataframe(config_path)  # returns pd.DataFrame or None on error
 ```
 
 ### Example: import into SQLite
 
-`stattab_to_sqlite.py` is a ready-to-run example of this pattern. It fetches a cube and loads it into an SQLite table using `pandas.to_sql()`:
+`stattab2sqlite.py` is a ready-to-run example of this pattern. It fetches a cube and loads it into an SQLite table using `pandas.to_sql()`:
 
 ```bash
 # Create/replace table (default)
-uv run python stattab_to_sqlite.py farms-bs
+uv run python stattab2sqlite.py criminal-stats
 
 # Custom database file and table name
-uv run python stattab_to_sqlite.py farms-bs --db mydata.db --table agricultural_holdings
+uv run python stattab2sqlite.py criminal-stats --db mydata.db --table theft_by_age
 
 # Append rows instead of replacing the table
-uv run python stattab_to_sqlite.py farms-bs --append
+uv run python stattab2sqlite.py criminal-stats --append
 ```
 
-The config name follows the same rules as `stat-tab-imp.py` — pass the filename without `.json`, or with the full name including any `.px` suffix:
-
-```bash
-uv run python stattab_to_sqlite.py pxapi-api_table_px-x-1903020100_102.px
-```
-
-The same `load_stattab_module()` + `fetch_dataframe()` pattern works for any other target — a PostgreSQL database, an API call, a reporting pipeline, etc. Only the part after `df = stattab.fetch_dataframe(config_path)` needs to change.
+The same `import stimp` + `fetch_dataframe()` pattern works for any other target — a PostgreSQL database, an API call, a reporting pipeline, etc. Only the part after `df = stimp.fetch_dataframe(config_path)` needs to change.
 
 ## Project layout
 
 ```
-stattab/
-├── stat-tab-imp.py        # PxWeb importer — CLI and library
-├── stattab_to_sqlite.py   # example: fetch cube → SQLite table
+stat-tab-imp/
+├── stimp.py               # PxWeb importer — CLI and library
+├── stattab2sqlite.py      # example: fetch cube → SQLite table
 ├── pyproject.toml         # dependencies
 ├── configs/
-│   └── farms-bs.json      # example: agricultural holdings, Basel-Stadt
+│   └── criminal-stats.json  # example: theft convictions by gender and age class
 └── output/                # generated CSVs (gitignored)
 ```

@@ -10,7 +10,17 @@ BASE_URL = "https://www.pxweb.bfs.admin.ch/api/v1"
 
 
 def resolve_config(config: dict, config_name: str) -> tuple[str, dict] | None:
-    """Return (url, payload) from either the manual format or the web-export format."""
+    """Derive the API endpoint URL and POST payload from a config dict.
+
+    Supports two config formats:
+    - Web-export format: keys ``queryObj`` and ``tableIdForQuery`` (downloaded
+      directly from the BFS Stat-Tab interface). The URL is constructed from
+      ``tableIdForQuery`` and the optional ``lang`` field (defaults to ``"de"``).
+    - Manual format: explicit ``url`` and ``payload`` keys.
+
+    Returns a ``(url, payload)`` tuple, or ``None`` if neither format is
+    recognised (a warning is printed in that case).
+    """
     if "queryObj" in config and "tableIdForQuery" in config:
         table_id = config["tableIdForQuery"]          # e.g. "px-x-1903020100_102.px"
         folder = table_id.removesuffix(".px")         # e.g. "px-x-1903020100_102"
@@ -27,7 +37,19 @@ def resolve_config(config: dict, config_name: str) -> tuple[str, dict] | None:
 
 
 def fetch_dataframe(config_path: Path) -> pd.DataFrame | None:
-    """Fetch a BFS PxWeb cube and return it as a DataFrame. Does not write any files."""
+    """Download a BFS PxWeb cube and return it as a flat DataFrame.
+
+    Reads the JSON config at *config_path*, calls the PxWeb API, and unpacks
+    the ``json-stat`` response into one row per cell of the data cube. Each
+    dimension becomes a column (using the dimension's display label), and the
+    measured value is in a final ``value`` column. Missing cells are ``None``.
+
+    Does not write any files — use :func:`run_import` for CSV output or pass
+    the returned DataFrame to your own storage layer.
+
+    Returns the DataFrame on success, or ``None`` if the config is invalid or
+    the API call fails (an explanatory message is printed in that case).
+    """
     config_name = config_path.stem
     config = json.loads(config_path.read_text())
 
@@ -77,6 +99,19 @@ def fetch_dataframe(config_path: Path) -> pd.DataFrame | None:
 
 
 def run_import(config_path: Path, verbose: bool = False) -> bool:
+    """Fetch a BFS PxWeb cube and write the result to a CSV file.
+
+    Delegates data retrieval to :func:`fetch_dataframe`, then writes the
+    DataFrame to ``output/<config-name>.csv`` relative to the project root.
+    The ``output/`` directory is created if it does not exist.
+
+    Args:
+        config_path: Path to the JSON config file.
+        verbose: If ``True``, print the first few rows of the DataFrame after saving.
+
+    Returns:
+        ``True`` on success, ``False`` if the download or config parsing failed.
+    """
     config_name = config_path.stem
     df = fetch_dataframe(config_path)
     if df is None:
@@ -94,6 +129,14 @@ def run_import(config_path: Path, verbose: bool = False) -> bool:
 
 
 def main():
+    """CLI entry point.
+
+    Parses arguments and runs one or all imports:
+
+    - ``stimp.py <config>`` — import a single named config.
+    - ``stimp.py --all`` — import every ``*.json`` file in ``configs/``.
+    - ``-v / --verbose`` — print the first rows of each output DataFrame.
+    """
     parser = argparse.ArgumentParser(description="Import data from the BFS PxWeb API.")
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("config", nargs="?", help="Config name (reads configs/<config>.json, writes output/<config>.csv)")

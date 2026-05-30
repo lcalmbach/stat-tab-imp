@@ -1,33 +1,37 @@
 """
-stattab_to_sqlite.py — download a BFS PxWeb cube and load it into SQLite.
+stattab2sqlite.py — download a BFS PxWeb cube and load it into SQLite.
 
 Usage:
-    uv run python stattab_to_sqlite.py <config> [--db PATH] [--table NAME] [--append]
+    uv run python stattab2sqlite.py <config> [--db PATH] [--table NAME] [--append]
 
 Example:
-    uv run python stattab_to_sqlite.py farms-bs
-    uv run python stattab_to_sqlite.py farms-bs --db mydata.db --table agricultural_holdings
-    uv run python stattab_to_sqlite.py farms-bs --append
+    uv run python stattab2sqlite.py criminal-stats
+    uv run python stattab2sqlite.py criminal-stats --db mydata.db --table theft_by_age
+    uv run python stattab2sqlite.py criminal-stats --append
 """
 
 import argparse
-import importlib.util
 import sqlite3
 from pathlib import Path
 
-
-def load_stattab_module():
-    # importlib needed because the filename contains hyphens
-    spec = importlib.util.spec_from_file_location(
-        "stattab_imp",
-        Path(__file__).parent / "stat-tab-imp.py",
-    )
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
+import stimp
 
 
 def main():
+    """CLI entry point.
+
+    Reads a named config from ``configs/``, downloads the corresponding BFS
+    PxWeb cube via :func:`stimp.fetch_dataframe`, and writes the result into
+    an SQLite table using ``pandas.to_sql``.
+
+    Args (CLI):
+        config: Config name (without ``.json``), e.g. ``criminal-stats`` or
+            ``pxapi-api_table_px-x-1903020100_102.px``.
+        --db: Path to the SQLite database file. Created if it does not exist.
+            Defaults to ``stattab.db`` in the current directory.
+        --table: Name of the target table. Defaults to the config name.
+        --append: Append rows to an existing table instead of replacing it.
+    """
     parser = argparse.ArgumentParser(
         description="Download a BFS PxWeb cube and import it into an SQLite database."
     )
@@ -42,8 +46,7 @@ def main():
     if not config_path.exists():
         raise SystemExit(f"Config not found: {config_path}")
 
-    stattab = load_stattab_module()
-    df = stattab.fetch_dataframe(config_path)
+    df = stimp.fetch_dataframe(config_path)
     if df is None:
         raise SystemExit("Download failed — see error above.")
 
